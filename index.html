@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Base de Alumnos — PRIOSAN</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+  <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js" defer></script>
+</head>
+<body>
+
+  <!-- ============ PANTALLA DE INICIO (elegir modo de datos) ============ -->
+  <div id="pantalla-inicio" class="pantalla-centrada">
+    <div class="tarjeta-inicio">
+      <h1>🎓 Base de Alumnos</h1>
+      <p class="subtitulo">Cursos y talleres · PRIOSAN</p>
+
+      <div class="opciones-inicio">
+        <button id="btn-abrir-onedrive" class="opcion-inicio">
+          <span class="opcion-icono">☁️</span>
+          <span class="opcion-texto">
+            <strong>Conectar con OneDrive</strong>
+            <small>Recomendado · funciona en Mac y Chromebook</small>
+          </span>
+        </button>
+        <button id="btn-abrir-carpeta" class="opcion-inicio">
+          <span class="opcion-icono">📁</span>
+          <span class="opcion-texto">
+            <strong>Abrir carpeta local</strong>
+            <small>Carpeta de OneDrive sincronizada en esta computadora</small>
+          </span>
+        </button>
+        <button id="btn-abrir-archivo" class="opcion-inicio">
+          <span class="opcion-icono">📄</span>
+          <span class="opcion-texto">
+            <strong>Cargar archivo</strong>
+            <small>Modo simple: cargar y descargar manualmente</small>
+          </span>
+        </button>
+        <button id="btn-base-nueva" class="opcion-inicio opcion-secundaria">
+          <span class="opcion-icono">✨</span>
+          <span class="opcion-texto">
+            <strong>Empezar base nueva</strong>
+            <small>Crear una base de datos vacía</small>
+          </span>
+        </button>
+      </div>
+      <p id="aviso-config" class="aviso-config oculto"></p>
+    </div>
+  </div>
+
+  <!-- ============ CANDADO (contraseña) ============ -->
+  <div id="pantalla-candado" class="pantalla-centrada oculto">
+    <div class="tarjeta-inicio">
+      <h1>🔒</h1>
+      <p class="subtitulo">Esta base de datos está protegida</p>
+      <form id="form-candado">
+        <input type="password" id="input-candado" placeholder="Contraseña" autocomplete="off">
+        <button type="submit" class="btn btn-primario">Entrar</button>
+      </form>
+      <p id="candado-error" class="texto-error oculto">Contraseña incorrecta</p>
+    </div>
+  </div>
+
+  <!-- ============ APP PRINCIPAL ============ -->
+  <div id="app" class="oculto">
+    <header class="barra-superior">
+      <div class="marca">🎓 <strong>Base de Alumnos</strong></div>
+      <nav class="nav-principal">
+        <button data-vista="buscar" class="nav-btn activo">🔍 Buscar</button>
+        <button data-vista="alumnos" class="nav-btn">👥 Alumnos</button>
+        <button data-vista="cursos" class="nav-btn">📚 Cursos</button>
+        <button data-vista="promos" class="nav-btn">🎁 Promociones</button>
+        <button data-vista="exportar" class="nav-btn">📤 Exportar</button>
+      </nav>
+      <div class="estado-guardado">
+        <span id="indicador-cambios" class="chip chip-ok">Sin cambios</span>
+        <button id="btn-guardar" class="btn btn-primario">💾 Guardar</button>
+      </div>
+    </header>
+
+    <main id="contenido"></main>
+  </div>
+
+  <!-- ============ MODALES ============ -->
+  <div id="modal-fondo" class="modal-fondo oculto">
+    <div id="modal-caja" class="modal-caja"></div>
+  </div>
+
+  <div id="toast" class="toast oculto"></div>
+
+  <script src="js/config.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
