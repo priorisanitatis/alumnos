@@ -184,9 +184,10 @@ export class GraphStorage {
 // ---------------- Carpeta local (File System Access) ----------------
 export class FolderStorage {
   constructor() {
-    this.nombre = "Carpeta local";
+    this.nombre = "Carpeta sincronizada (Google Drive)";
     this.tipo = "carpeta";
     this.dir = null;
+    this.revBase = null; // versión que traía el archivo cuando lo cargamos
   }
 
   static disponible() {
@@ -202,7 +203,21 @@ export class FolderStorage {
     try {
       const fh = await this.dir.getFileHandle(CFG.localFileName);
       const f = await fh.getFile();
-      return JSON.parse(await f.text());
+      const datos = JSON.parse(await f.text());
+      this.revBase = datos?.meta?.rev ?? 0;
+      return datos;
+    } catch (e) {
+      if (e.name === "NotFoundError") return null;
+      throw e;
+    }
+  }
+
+  // Lee la versión que hay ahora mismo en el disco, sin cargar toda la base.
+  async _revEnDisco() {
+    try {
+      const fh = await this.dir.getFileHandle(CFG.localFileName);
+      const f = await fh.getFile();
+      return JSON.parse(await f.text())?.meta?.rev ?? 0;
     } catch (e) {
       if (e.name === "NotFoundError") return null;
       throw e;
@@ -211,10 +226,24 @@ export class FolderStorage {
 
   async guardar(db) {
     const cuerpo = JSON.stringify(db, null, 2);
+
+    // Protección contra pisarse los cambios: si OneDrive ya sincronizó un
+    // guardado de la otra persona, el archivo en disco trae una versión más
+    // nueva que la que cargamos, y no debemos sobreescribirla.
+    if (this.revBase !== null) {
+      const enDisco = await this._revEnDisco();
+      if (enDisco !== null && enDisco !== this.revBase) {
+        throw new Error("CONFLICTO: el archivo cambió desde que lo abriste (seguramente la otra persona guardó y OneDrive ya sincronizó). " +
+          "Para no perder su trabajo, exporta un respaldo (Exportar → Respaldo JSON), vuelve a abrir la base y captura de nuevo tus cambios.");
+      }
+    }
+
     const fh = await this.dir.getFileHandle(CFG.localFileName, { create: true });
     const w = await fh.createWritable();
     await w.write(cuerpo);
     await w.close();
+    this.revBase = db?.meta?.rev ?? 0;
+
     // Respaldo con fecha en subcarpeta "respaldos"
     try {
       const dirR = await this.dir.getDirectoryHandle("respaldos", { create: true });

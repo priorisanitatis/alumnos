@@ -108,16 +108,25 @@ $("#btn-abrir-onedrive").addEventListener("click", async () => {
   }
 });
 
+// El modo OneDrive solo aparece si alguien configuró el ID de Microsoft.
+if (GraphStorage.configurado()) $("#btn-abrir-onedrive").classList.remove("oculto");
+
 $("#btn-abrir-carpeta").addEventListener("click", async () => {
   if (!FolderStorage.disponible()) {
-    return toast("Este navegador no permite abrir carpetas. Usa «Cargar archivo» o el modo OneDrive.", "error");
+    return toast("Este navegador no permite abrir carpetas. Usa «Cargar archivo», o abre la app en Chrome.", "error");
   }
   try {
     storage = new FolderStorage();
     await storage.conectar();
     const datos = await storage.cargar();
     if (datos === null) {
-      if (confirm("En esta carpeta no existe todavía «" + window.APP_CONFIG.localFileName + "».\n¿Crear una base de datos nueva aquí?")) {
+      const seguir = confirm(
+        "⚠️ En la carpeta que elegiste no existe «" + window.APP_CONFIG.localFileName + "».\n\n" +
+        "Si la base YA EXISTE, seguramente elegiste la carpeta equivocada: cancela y vuelve a intentar " +
+        "eligiendo la carpeta compartida de Google Drive.\n\n" +
+        "Si continúas, se creará una base nueva y vacía, aparte de la que ya tengan.\n\n" +
+        "¿Crear de todos modos una base nueva y vacía aquí?");
+      if (seguir) {
         await entrar(M.baseVacia());
         marcar();
       }
@@ -181,7 +190,7 @@ function elegirDestinoYGuardar() {
     <h3>¿Dónde guardar la base?</h3>
     <div class="opciones-inicio">
       ${graphOK ? `<button class="opcion-inicio" data-dest="graph"><span class="opcion-icono">☁️</span><span class="opcion-texto"><strong>OneDrive (internet)</strong><small>Recomendado</small></span></button>` : ""}
-      ${FolderStorage.disponible() ? `<button class="opcion-inicio" data-dest="carpeta"><span class="opcion-icono">📁</span><span class="opcion-texto"><strong>Carpeta local</strong><small>Elegir carpeta de OneDrive en esta computadora</small></span></button>` : ""}
+      ${FolderStorage.disponible() ? `<button class="opcion-inicio" data-dest="carpeta"><span class="opcion-icono">📁</span><span class="opcion-texto"><strong>Carpeta de Google Drive</strong><small>Elegir la carpeta sincronizada en esta computadora</small></span></button>` : ""}
       <button class="opcion-inicio" data-dest="archivo"><span class="opcion-icono">📄</span><span class="opcion-texto"><strong>Descargar archivo</strong><small>Guardas tú el archivo donde quieras</small></span></button>
     </div>
     <div class="fila-botones"><button class="btn btn-suave" data-cancelar>Cancelar</button></div>
@@ -618,14 +627,16 @@ function renderExportar() {
       </div>
       <p style="color:var(--color-texto-suave);font-size:13.5px;margin-top:10px">
         Es el archivo completo de la base. Se puede volver a cargar con «Cargar archivo» en la pantalla de inicio.
-        Además, cada vez que guardas, la app deja automáticamente una copia con fecha en la carpeta «respaldos».
+        Además, cada vez que guardas, la app deja automáticamente una copia con fecha en la subcarpeta «respaldos»
+        de la misma carpeta de Google Drive.
       </p>
     </div>
     <div class="tarjeta">
       <h3 style="margin-bottom:10px;font-size:17px">🔒 Contraseña de la app</h3>
       <p style="color:var(--color-texto-suave);font-size:13.5px;margin-bottom:10px">
         Candado al abrir la base. Es un disuasivo, no una protección total: la protección real
-        son los permisos de tu OneDrive. ${db.meta.passwordHash ? "<strong>Contraseña activa.</strong>" : "<strong>Sin contraseña.</strong>"}
+        son los permisos de compartición de Google Drive.
+        ${db.meta.passwordHash ? "<strong>Contraseña activa.</strong>" : "<strong>Sin contraseña.</strong>"}
       </p>
       <div class="fila-botones" style="justify-content:flex-start">
         <button class="btn btn-suave" id="btn-cambiar-pass">${db.meta.passwordHash ? "Cambiar contraseña" : "Poner contraseña"}</button>
