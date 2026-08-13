@@ -4,6 +4,7 @@
 
 import * as M from "./model.js";
 import * as X from "./export.js";
+import * as I from "./import.js";
 import { GraphStorage, FolderStorage, FileStorage } from "./storage.js";
 
 // ---------------- estado global ----------------
@@ -268,6 +269,7 @@ function render() {
     curso: renderCurso,
     edicion: renderEdicion,
     promos: renderPromos,
+    importar: renderImportar,
     exportar: renderExportar
   };
   (vistas[vista.nombre] || renderBuscar)();
@@ -659,6 +661,229 @@ function renderPromos() {
       render();
     }
   }));
+}
+
+// ============================================================
+// VISTA: IMPORTAR (respuestas del formulario)
+// ============================================================
+
+// Estado del asistente de importación (se pierde al cambiar de vista, a propósito)
+let imp = { filas: null, mapeo: null, analisis: null, archivo: "", resultado: null };
+
+const CAMPOS_IMPORT = [
+  ["nombres", "Nombre(s)"],
+  ["apellidoPaterno", "Apellido paterno"],
+  ["apellidoMaterno", "Apellido materno"],
+  ["email", "Email"],
+  ["telefono", "Teléfono"],
+  ["nombreCompleto", "Nombre completo (si viene en una sola casilla)"]
+];
+
+const ESTADOS = {
+  nuevo:        { et: "✨ Nuevo",       clase: "etiqueta-vivo",    ayuda: "Se creará el alumno" },
+  actualiza:    { et: "➕ Completa",    clase: "etiqueta-promo",   ayuda: "Ya existe; se le llenan datos que le faltaban" },
+  conflicto:    { et: "⚠️ Distinto",   clase: "etiqueta-revisar", ayuda: "Ya existe con OTRO dato" },
+  "sin-cambio": { et: "= Sin cambio",   clase: "etiqueta-video",   ayuda: "Ya está igual" },
+  repetido:     { et: "⊘ Repetido",    clase: "etiqueta-revisar", ayuda: "Viene dos veces en el archivo" },
+  error:        { et: "✕ Error",        clase: "etiqueta-revisar", ayuda: "No se puede importar" }
+};
+
+function renderImportar() {
+  if (imp.resultado) return renderImportResultado();
+  if (!imp.filas) return renderImportPaso1();
+  renderImportPaso2();
+}
+
+function renderImportPaso1() {
+  $("#contenido").innerHTML = `
+    <div class="encabezado-vista"><h2>📥 Importar alumnos</h2></div>
+    <div class="tarjeta">
+      <p style="margin-bottom:14px">
+        Sube el archivo de respuestas de tu formulario (CSV). La app te va a mostrar
+        <strong>exactamente qué va a pasar</strong> antes de tocar nada.</p>
+      <input type="file" id="archivo-import" accept=".csv,.txt,text/csv" style="font:inherit">
+      <p style="color:var(--color-texto-suave);font-size:13.5px;margin-top:14px">
+        <strong>Cómo obtenerlo desde Google Forms:</strong> abre el formulario →
+        pestaña «Respuestas» → ícono verde de Sheets → en la hoja,
+        «Archivo» → «Descargar» → «Valores separados por comas (.csv)».
+      </p>
+    </div>
+    <div class="tarjeta">
+      <h3 style="font-size:16px;margin-bottom:8px">Qué reconoce sola</h3>
+      <p style="color:var(--color-texto-suave);font-size:13.5px">
+        Detecta las columnas por su título: «nombre», «apellido paterno», «apellido materno»,
+        «correo/email» y «teléfono/celular/WhatsApp». Si no acierta, tú se lo corriges
+        con unos menús antes de importar. Las columnas que no sirvan (marca de tiempo,
+        etc.) simplemente se ignoran.
+      </p>
+    </div>
+  `;
+  $("#archivo-import").addEventListener("change", async ev => {
+    const f = ev.target.files[0];
+    if (!f) return;
+    try {
+      const filas = I.parsearCSV(await f.text());
+      if (filas.length < 2) return toast("El archivo no tiene filas de datos", "error");
+      imp.filas = filas;
+      imp.archivo = f.name;
+      imp.mapeo = I.detectarColumnas(filas[0]);
+      render();
+    } catch (e) {
+      toast("No se pudo leer el archivo: " + e.message, "error");
+    }
+  });
+}
+
+function renderImportPaso2() {
+  const encabezados = imp.filas[0];
+  imp.analisis = I.analizar(db, imp.filas, imp.mapeo);
+  const r = imp.analisis.resumen;
+  const totalUtiles = r.nuevo + r.actualiza + r.conflicto;
+  const ediciones = db.ediciones.map(e => ({ id: e.id, texto: M.etiquetaEdicion(db, e.id) }))
+    .sort((a, b) => a.texto.localeCompare(b.texto, "es"));
+
+  $("#contenido").innerHTML = `
+    <div class="encabezado-vista">
+      <h2>📥 Revisar antes de importar</h2>
+      <button class="btn btn-suave btn-mini" id="imp-cancelar">Empezar de nuevo</button>
+    </div>
+
+    <div class="tarjeta">
+      <h3 style="font-size:16px;margin-bottom:10px">1 · ¿Qué columna es cuál?</h3>
+      <p style="color:var(--color-texto-suave);font-size:13.5px;margin-bottom:10px">
+        Archivo: <strong>${esc(imp.archivo)}</strong> · ${imp.filas.length - 1} fila(s).
+        Revisa que esté bien y corrígelo si hace falta.</p>
+      <div class="form-grid">
+        ${CAMPOS_IMPORT.map(([campo, etiqueta]) => `
+          <div class="campo">
+            <label>${etiqueta}</label>
+            <select data-campo="${campo}">
+              <option value="">— ninguna —</option>
+              ${encabezados.map((h, i) =>
+                `<option value="${i}" ${imp.mapeo[campo] === i ? "selected" : ""}>${esc(h || "(columna " + (i + 1) + ")")}</option>`
+              ).join("")}
+            </select>
+          </div>`).join("")}
+      </div>
+      ${imp.mapeo.nombreCompleto !== undefined && imp.mapeo.nombres === undefined ? `
+        <div class="aviso-duplicado" style="margin-top:12px">
+          ⚠️ El nombre viene en <strong>una sola casilla</strong>, así que la app tiene que
+          adivinar dónde termina el nombre y empiezan los apellidos. Los casos dudosos quedarán
+          marcados como «revisar» en la ficha del alumno.
+        </div>` : ""}
+    </div>
+
+    <div class="tarjeta">
+      <h3 style="font-size:16px;margin-bottom:10px">2 · Qué va a pasar</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        ${Object.entries(r).filter(([, n]) => n > 0).map(([est, n]) =>
+          `<span class="etiqueta ${ESTADOS[est].clase}" style="font-size:13px;padding:5px 12px">
+             ${ESTADOS[est].et}: ${n}</span>`).join("")}
+      </div>
+      <div style="max-height:340px;overflow:auto;border:1px solid var(--color-borde);border-radius:8px">
+        <table><thead><tr><th>Línea</th><th>Alumno</th><th>Qué pasará</th></tr></thead><tbody>
+          ${imp.analisis.filas.map(f => `
+            <tr>
+              <td style="color:var(--color-texto-suave)">${f.linea}</td>
+              <td>${esc(M.nombreCompleto(f.entrada) || "(sin nombre)")}
+                ${f.entrada.email ? `<br><span class="secundario" style="font-size:12px;color:var(--color-texto-suave)">${esc(f.entrada.email)}</span>` : ""}</td>
+              <td><span class="etiqueta ${ESTADOS[f.estado].clase}">${ESTADOS[f.estado].et}</span>
+                ${f.motivo ? `<br><span style="font-size:12px;color:var(--color-texto-suave)">${esc(f.motivo)}</span>` : ""}
+                ${f.advertencia ? `<br><span style="font-size:12px;color:#a06a10">⚠️ ${esc(f.advertencia)}</span>` : ""}
+                ${f.cambios.length ? `<br><span style="font-size:12px;color:var(--color-texto-suave)">${
+                  f.cambios.map(c => c.tipo === "rellena"
+                    ? `se le pone ${esc(c.campo)}: <strong>${esc(c.a)}</strong>`
+                    : `${esc(c.campo)}: «${esc(c.de)}» → «${esc(c.a)}»`).join("<br>")}</span>` : ""}
+                ${f.encontradoPor === "nombre" ? `<br><span style="font-size:12px;color:var(--color-texto-suave)">(reconocido por nombre, no por email)</span>` : ""}
+              </td>
+            </tr>`).join("")}
+        </tbody></table>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h3 style="font-size:16px;margin-bottom:10px">3 · Opciones</h3>
+      ${r.conflicto ? `
+        <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:12px;font-size:14px">
+          <input type="checkbox" id="imp-preferir" style="margin-top:3px">
+          <span>En los <strong>${r.conflicto} caso(s) marcados «Distinto»</strong>, reemplazar el dato
+          viejo por el del formulario.<br>
+          <span style="color:var(--color-texto-suave);font-size:13px">Si lo dejas sin marcar, se conserva
+          lo que ya estaba en la base y solo se llenan los campos vacíos.</span></span>
+        </label>` : ""}
+      <div class="campo" style="margin-bottom:12px">
+        <label>Inscribir a todos a una edición (opcional)</label>
+        <select id="imp-edicion">
+          <option value="">— no inscribir, solo registrar los datos —</option>
+          ${ediciones.map(e => `<option value="${e.id}">${esc(e.texto)}</option>`).join("")}
+        </select>
+      </div>
+      <div class="fila-botones">
+        <button class="btn btn-suave" id="imp-cancelar2">Cancelar</button>
+        <button class="btn btn-primario" id="imp-aplicar" ${totalUtiles ? "" : "disabled"}>
+          Importar ${totalUtiles} alumno(s)
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.querySelectorAll("[data-campo]").forEach(sel =>
+    sel.addEventListener("change", () => {
+      const v = sel.value;
+      if (v === "") delete imp.mapeo[sel.dataset.campo];
+      else imp.mapeo[sel.dataset.campo] = Number(v);
+      render();
+    }));
+
+  const reiniciar = () => { imp = { filas: null, mapeo: null, analisis: null, archivo: "", resultado: null }; render(); };
+  $("#imp-cancelar").addEventListener("click", reiniciar);
+  $("#imp-cancelar2").addEventListener("click", reiniciar);
+
+  $("#imp-aplicar").addEventListener("click", () => {
+    const preferirNuevos = !!$("#imp-preferir")?.checked;
+    const edicionId = $("#imp-edicion").value || null;
+    const aviso = edicionId
+      ? `Se van a importar ${totalUtiles} alumno(s) e inscribirlos en «${M.etiquetaEdicion(db, edicionId)}».`
+      : `Se van a importar ${totalUtiles} alumno(s).`;
+    if (!confirm(aviso + "\n\n¿Continuar?")) return;
+    imp.resultado = I.aplicar(db, imp.analisis, { preferirNuevos, edicionId });
+    marcar();
+    render();
+  });
+}
+
+function renderImportResultado() {
+  const res = imp.resultado;
+  $("#contenido").innerHTML = `
+    <div class="encabezado-vista"><h2>✅ Importación terminada</h2></div>
+    <div class="tarjeta">
+      <div class="datos-grid">
+        <div class="dato"><label>Alumnos creados</label><div style="font-size:24px">${res.creados}</div></div>
+        <div class="dato"><label>Alumnos actualizados</label><div style="font-size:24px">${res.actualizados}</div></div>
+        <div class="dato"><label>Inscripciones</label><div style="font-size:24px">${res.inscritos}</div></div>
+        ${res.promos ? `<div class="dato"><label>Cursos de regalo</label><div style="font-size:24px">${res.promos}</div></div>` : ""}
+        ${res.omitidos ? `<div class="dato"><label>Filas omitidas</label><div style="font-size:24px">${res.omitidos}</div></div>` : ""}
+      </div>
+      <div class="aviso-duplicado" style="margin-top:16px">
+        ⚠️ Los cambios están <strong>en la app pero todavía no en el archivo</strong>.
+        Pulsa <strong>💾 Guardar</strong> para dejarlos grabados en Google Drive.
+      </div>
+      <div class="fila-botones">
+        <button class="btn btn-suave" id="imp-otra">Importar otro archivo</button>
+        <button class="btn btn-verde" id="imp-ver">Ver alumnos</button>
+        <button class="btn btn-primario" id="imp-guardar">💾 Guardar ahora</button>
+      </div>
+    </div>
+  `;
+  $("#imp-otra").addEventListener("click", () => {
+    imp = { filas: null, mapeo: null, analisis: null, archivo: "", resultado: null };
+    render();
+  });
+  $("#imp-ver").addEventListener("click", () => {
+    imp = { filas: null, mapeo: null, analisis: null, archivo: "", resultado: null };
+    navegar("alumnos");
+  });
+  $("#imp-guardar").addEventListener("click", guardar);
 }
 
 // ============================================================
