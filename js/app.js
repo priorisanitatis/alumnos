@@ -531,6 +531,8 @@ function renderEdicion() {
         <h2>${esc(c?.nombre || "?")} · ${esc(e.periodo || "sin fecha")}</h2>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-verde btn-mini" id="btn-inscribir-aqui">➕ Inscribir alumno</button>
+          <button class="btn btn-suave btn-mini" id="btn-constancias">🎓 Constancias</button>
+          <button class="btn btn-suave btn-mini" id="btn-copiar-nombres">📋 Copiar nombres</button>
           <button class="btn btn-suave btn-mini" id="btn-editar-edicion">✏️ Editar</button>
           <button class="btn btn-suave btn-mini" id="btn-exportar-edicion">📤 Exportar</button>
           <button class="btn btn-peligro btn-mini" id="btn-eliminar-edicion">🗑 Eliminar</button>
@@ -555,6 +557,30 @@ function renderEdicion() {
   $("#btn-inscribir-aqui").addEventListener("click", () => modalInscribir({ edicionId: e.id }));
   $("#btn-editar-edicion").addEventListener("click", () => modalEdicion(e.cursoId, e));
   $("#btn-exportar-edicion").addEventListener("click", () => entregarExport(X.construirEdicion(db, e.id), "Lista de inscritos"));
+  $("#btn-constancias").addEventListener("click", () => {
+    if (!inscritos.length) return toast("Esta edición no tiene inscritos todavía", "error");
+    entregarExport(X.construirConstancias(db, e.id), "Lista para constancias");
+  });
+  $("#btn-copiar-nombres").addEventListener("click", async () => {
+    const texto = X.nombresParaPegar(db, e.id);
+    if (!texto) return toast("Esta edición no tiene inscritos todavía", "error");
+    const n = texto.split("\n").length;
+    try {
+      await navigator.clipboard.writeText(texto);
+      toast(`📋 ${n} nombre(s) copiados — ya puedes pegarlos en Canva`);
+    } catch {
+      // Si el navegador bloquea el portapapeles, mostramos la lista para copiar a mano.
+      abrirModal(`
+        <h3>📋 Nombres para copiar (${n})</h3>
+        <p style="color:var(--color-texto-suave);font-size:13.5px;margin-bottom:10px">
+          Selecciona todo el texto y cópialo con Cmd+C.</p>
+        <textarea readonly style="width:100%;height:260px;font-family:inherit;padding:10px;
+          border:1px solid var(--color-borde);border-radius:8px">${esc(texto)}</textarea>
+        <div class="fila-botones"><button class="btn btn-suave" data-cancelar>Cerrar</button></div>
+      `);
+      $("#modal-caja").querySelector("textarea").select();
+    }
+  });
   $("#btn-eliminar-edicion").addEventListener("click", () => {
     if (confirm("¿Eliminar esta edición y todas sus inscripciones?")) {
       const cursoId = e.cursoId;
