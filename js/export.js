@@ -113,14 +113,20 @@ function inscritosOrdenadosPorNombre(db, edicionId) {
 export function construirConstancias(db, edicionId) {
   const e = db.ediciones.find(x => x.id === edicionId);
   const c = e ? db.cursos.find(x => x.id === e.cursoId) : null;
-  const filas = [["#", "Nombre completo", "Email", "Teléfono", "Curso", "Fecha"]];
+  // Exactamente tres columnas, en este orden: lo que espera Canva
+  // ("Crear en lote") y la app de envío de constancias por email.
+  const filas = [["Número de Alumno", "Nombre del Alumno", "Email del Alumno"]];
+  const sinEmail = [];
   inscritosOrdenadosPorNombre(db, edicionId).forEach(({ a }, idx) => {
-    filas.push([idx + 1, nombreParaConstancia(nombreCompleto(a)), a.email || "", a.telefono || "",
-      c?.nombre || "", e?.periodo || ""]);
+    const email = (a.email || "").trim();
+    if (!email) sinEmail.push(nombreParaConstancia(nombreCompleto(a)));
+    filas.push([idx + 1, nombreParaConstancia(nombreCompleto(a)), email]);
   });
   return {
     nombre: "constancias_" + limpiaNombre((c?.nombre || "curso") + "_" + (e?.periodo || "")) + ".csv",
-    contenido: armarCSV(filas)
+    contenido: armarCSV(filas),
+    total: filas.length - 1,
+    sinEmail
   };
 }
 
