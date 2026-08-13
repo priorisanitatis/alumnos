@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "lastSavedBy": "Carpeta sincronizada (Google Drive)",
+    "lastSavedAt": "2026-08-12T23:55:06.195Z",
+    "rev": 4,
+    "passwordHash": null
+  },
+  "alumnos": [
+    {
+      "id": "8fa9d07d-f475-412f-ba97-589ad37605e6",
+      "nombres": "Guillermina",
+      "apellidoPaterno": "Zúñiga",
+      "apellidoMaterno": "Díaz",
+      "email": "zdguille@gmail.com",
+      "telefono": "3314375914",
+      "nota": "La Doña",
+      "revisar": false,
+      "createdAt": "2026-08-12T23:51:01.560Z"
+    }
+  ],
+  "cursos": [
+    {
+      "id": "47b48693-ab89-4c4c-9e8d-4f80867c11ec",
+      "nombre": "Organoterapia",
+      "tipo": "vivo",
+      "descripcion": ""
+    },
+    {
+      "id": "e2eddfc6-81d7-4376-bef4-e3111b15afcc",
+      "nombre": "Psicología Homeopática",
+      "tipo": "vivo",
+      "descripcion": ""
+    }
+  ],
+  "ediciones": [
+    {
+      "id": "f44c9ad8-59e5-4710-96f5-304776fb2a90",
+      "cursoId": "47b48693-ab89-4c4c-9e8d-4f80867c11ec",
+      "periodo": "Agosto 2026",
+      "nota": ""
+    },
+    {
+      "id": "7ef84145-3445-4952-a3a7-ef52dd5d2fde",
+      "cursoId": "e2eddfc6-81d7-4376-bef4-e3111b15afcc",
+      "periodo": "Agosto 2026",
+      "nota": ""
+    }
+  ],
+  "inscripciones": [
+    {
+      "id": "b8248e02-a2ed-42f5-899c-9962bc8461af",
+      "alumnoId": "8fa9d07d-f475-412f-ba97-589ad37605e6",
+      "edicionId": "f44c9ad8-59e5-4710-96f5-304776fb2a90",
+      "fecha": "2026-08-12",
+      "nota": "",
+      "promo": false,
+      "promoDe": null
+    },
+    {
+      "id": "92b91bfa-3505-4afd-bef9-42dfd59b0c41",
+      "alumnoId": "8fa9d07d-f475-412f-ba97-589ad37605e6",
+      "edicionId": "7ef84145-3445-4952-a3a7-ef52dd5d2fde",
+      "fecha": "2026-08-12",
+      "nota": "Promoción automática",
+      "promo": true,
+      "promoDe": "b8248e02-a2ed-42f5-899c-9962bc8461af"
+    }
+  ],
+  "promociones": [
+    {
+      "id": "936d66af-a547-48d2-b4b7-c3c2e89b339a",
+      "triggerCursoId": "47b48693-ab89-4c4c-9e8d-4f80867c11ec",
+      "giftEdicionId": "7ef84145-3445-4952-a3a7-ef52dd5d2fde",
+      "activa": true
+    }
+  ]
+}

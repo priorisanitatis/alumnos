@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "lastSavedBy": "Carpeta sincronizada (Google Drive)",
+    "lastSavedAt": "2026-08-12T23:51:41.699Z",
+    "rev": 1,
+    "passwordHash": null
+  },
+  "alumnos": [
+    {
+      "id": "8fa9d07d-f475-412f-ba97-589ad37605e6",
+      "nombres": "Guillermina",
+      "apellidoPaterno": "Zúñiga",
+      "apellidoMaterno": "Díaz",
+      "email": "zdguille@gmail.com",
+      "telefono": "3314375914",
+      "nota": "La Doña",
+      "revisar": false,
+      "createdAt": "2026-08-12T23:51:01.560Z"
+    }
+  ],
+  "cursos": [],
+  "ediciones": [],
+  "inscripciones": [],
+  "promociones": []
+}
