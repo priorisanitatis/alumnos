@@ -200,7 +200,9 @@ async function guardarCon(st) {
   await st.guardar(db);
   dirty = false;
   actualizarChip();
-  toast("💾 Guardado (" + st.nombre + ")");
+  const depurados = st.ultimaLimpieza || 0;
+  toast("💾 Guardado (" + st.nombre + ")" +
+    (depurados ? ` · ${depurados} respaldo(s) antiguo(s) depurado(s)` : ""));
 }
 
 function elegirDestinoYGuardar() {

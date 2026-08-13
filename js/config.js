@@ -26,5 +26,10 @@ window.APP_CONFIG = {
   backupFolderPath: "PRIOSAN/BaseAlumnos/respaldos",
 
   // Nombre del archivo de datos dentro de la carpeta de Google Drive
-  localFileName: "datos-alumnos.json"
+  localFileName: "datos-alumnos.json",
+
+  // Cuántos respaldos con fecha conservar en la subcarpeta "respaldos".
+  // Al guardar, los más antiguos que sobrepasen este número se borran solos.
+  // Pon 0 para desactivar la limpieza y conservarlos todos.
+  maxRespaldos: 30
 };

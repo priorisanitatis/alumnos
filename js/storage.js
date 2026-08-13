@@ -224,6 +224,34 @@ export class FolderStorage {
     }
   }
 
+  // Conserva solo los respaldos más recientes y borra los que sobran.
+  //
+  // Reglas de seguridad, a propósito estrictas:
+  //  - Solo borra archivos cuyo nombre calce EXACTAMENTE con el patrón que
+  //    genera la app ("datos-alumnos-AAAAMMDD-HHMM.json"). Cualquier otro
+  //    archivo que haya en la carpeta se queda intacto.
+  //  - Nunca toca subcarpetas.
+  //  - Nunca toca el archivo vivo (que vive fuera de "respaldos").
+  //  - Los nombres llevan fecha de ancho fijo, así que ordenarlos
+  //    alfabéticamente equivale a ordenarlos por fecha.
+  async _limpiarRespaldos(dirR) {
+    const max = CFG.maxRespaldos;
+    if (!max || max < 1) return 0; // 0 = conservar todos
+    const patron = /^datos-alumnos-\d{8}-\d{4}\.json$/;
+    const nombres = [];
+    for await (const [nombre, handle] of dirR.entries()) {
+      if (handle.kind === "file" && patron.test(nombre)) nombres.push(nombre);
+    }
+    if (nombres.length <= max) return 0;
+    nombres.sort().reverse();              // más reciente primero
+    const sobrantes = nombres.slice(max);  // los más viejos
+    let borrados = 0;
+    for (const n of sobrantes) {
+      try { await dirR.removeEntry(n); borrados++; } catch { /* si uno falla, seguimos */ }
+    }
+    return borrados;
+  }
+
   // Guarda una exportación dentro de la subcarpeta "exportaciones" de la
   // misma carpeta de Google Drive. Devuelve la ruta para avisar al usuario.
   async guardarExport(nombre, contenido) {
@@ -256,13 +284,15 @@ export class FolderStorage {
     this.revBase = db?.meta?.rev ?? 0;
 
     // Respaldo con fecha en subcarpeta "respaldos"
+    this.ultimaLimpieza = 0;
     try {
       const dirR = await this.dir.getDirectoryHandle("respaldos", { create: true });
       const fhR = await dirR.getFileHandle("datos-alumnos-" + marcaDeTiempo() + ".json", { create: true });
       const wR = await fhR.createWritable();
       await wR.write(cuerpo);
       await wR.close();
-    } catch { /* respaldo opcional */ }
+      this.ultimaLimpieza = await this._limpiarRespaldos(dirR);
+    } catch { /* respaldo opcional: nunca debe impedir el guardado */ }
   }
 }
 
