@@ -1,27 +1,27 @@
 // ============================================================
-// EXPORTACIÓN A EXCEL (CSV con BOM UTF-8, se abre directo en Excel)
+// EXPORTACIÓN A HOJAS DE CÁLCULO
+//
+// Genera CSV con BOM UTF-8, que Google Sheets, Excel y Numbers
+// abren directamente. Aquí solo se CONSTRUYE el contenido; quien
+// decide dónde va a parar (Google Drive o Descargas) es app.js.
 // ============================================================
 
-import { nombreCompleto, etiquetaEdicion } from "./model.js";
+import { nombreCompleto } from "./model.js";
 
 function celda(v) {
   const s = String(v ?? "");
   return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
-function descargarCSV(nombreArchivo, filas) {
-  const contenido = "\ufeff" + filas.map(f => f.map(celda).join(",")).join("\r\n");
-  const blob = new Blob([contenido], { type: "text/csv;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = nombreArchivo;
-  a.click();
-  URL.revokeObjectURL(a.href);
+function armarCSV(filas) {
+  return "\ufeff" + filas.map(f => f.map(celda).join(",")).join("\r\n");
 }
 
 const limpiaNombre = s => s.replace(/[^\wáéíóúñÁÉÍÓÚÑ -]/gi, "").trim().replace(/\s+/g, "_");
 
-export function exportarAlumnos(db) {
+// ---------- constructores: devuelven { nombre, contenido } ----------
+
+export function construirAlumnos(db) {
   const filas = [["Apellido paterno", "Apellido materno", "Nombre(s)", "Email", "Teléfono", "Nota", "Cursos tomados"]];
   const alumnos = [...db.alumnos].sort((a, b) =>
     (a.apellidoPaterno + a.apellidoMaterno + a.nombres).localeCompare(b.apellidoPaterno + b.apellidoMaterno + b.nombres, "es"));
@@ -29,10 +29,10 @@ export function exportarAlumnos(db) {
     const n = db.inscripciones.filter(i => i.alumnoId === a.id).length;
     filas.push([a.apellidoPaterno, a.apellidoMaterno, a.nombres, a.email, a.telefono, a.nota, n]);
   }
-  descargarCSV("alumnos_todos.csv", filas);
+  return { nombre: "alumnos_todos.csv", contenido: armarCSV(filas) };
 }
 
-export function exportarInscripciones(db) {
+export function construirInscripciones(db) {
   const filas = [["Alumno", "Email", "Teléfono", "Curso", "Edición", "Fecha de inscripción", "Promoción", "Nota"]];
   for (const i of db.inscripciones) {
     const a = db.alumnos.find(x => x.id === i.alumnoId);
@@ -45,10 +45,10 @@ export function exportarInscripciones(db) {
       i.fecha, i.promo ? "Sí" : "", i.nota
     ]);
   }
-  descargarCSV("inscripciones_todas.csv", filas);
+  return { nombre: "inscripciones_todas.csv", contenido: armarCSV(filas) };
 }
 
-export function exportarEdicion(db, edicionId) {
+export function construirEdicion(db, edicionId) {
   const e = db.ediciones.find(x => x.id === edicionId);
   const c = e ? db.cursos.find(x => x.id === e.cursoId) : null;
   const filas = [["Apellido paterno", "Apellido materno", "Nombre(s)", "Email", "Teléfono", "Fecha de inscripción", "Promoción", "Nota"]];
@@ -57,10 +57,13 @@ export function exportarEdicion(db, edicionId) {
     filas.push([a?.apellidoPaterno || "", a?.apellidoMaterno || "", a?.nombres || "(eliminado)",
       a?.email || "", a?.telefono || "", i.fecha, i.promo ? "Sí" : "", i.nota]);
   }
-  descargarCSV(limpiaNombre((c?.nombre || "curso") + "_" + (e?.periodo || "")) + ".csv", filas);
+  return {
+    nombre: limpiaNombre((c?.nombre || "curso") + "_" + (e?.periodo || "")) + ".csv",
+    contenido: armarCSV(filas)
+  };
 }
 
-export function exportarCurso(db, cursoId) {
+export function construirCurso(db, cursoId) {
   const c = db.cursos.find(x => x.id === cursoId);
   const filas = [["Edición", "Apellido paterno", "Apellido materno", "Nombre(s)", "Email", "Teléfono", "Fecha de inscripción", "Promoción", "Nota"]];
   for (const e of db.ediciones.filter(x => x.cursoId === cursoId)) {
@@ -70,15 +73,28 @@ export function exportarCurso(db, cursoId) {
         a?.email || "", a?.telefono || "", i.fecha, i.promo ? "Sí" : "", i.nota]);
     }
   }
-  descargarCSV(limpiaNombre(c?.nombre || "curso") + "_todas_ediciones.csv", filas);
+  return {
+    nombre: limpiaNombre(c?.nombre || "curso") + "_todas_ediciones.csv",
+    contenido: armarCSV(filas)
+  };
 }
 
-export function exportarRespaldoJSON(db) {
-  const blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json" });
-  const a = document.createElement("a");
+export function construirRespaldoJSON(db) {
   const d = new Date(), p = n => String(n).padStart(2, "0");
+  return {
+    nombre: `respaldo-alumnos-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}.json`,
+    contenido: JSON.stringify(db, null, 2)
+  };
+}
+
+// ---------- entrega por descarga (carpeta Descargas) ----------
+
+export function descargar({ nombre, contenido }) {
+  const tipo = nombre.endsWith(".json") ? "application/json" : "text/csv;charset=utf-8";
+  const blob = new Blob([contenido], { type: tipo });
+  const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `respaldo-alumnos-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}.json`;
+  a.download = nombre;
   a.click();
   URL.revokeObjectURL(a.href);
 }

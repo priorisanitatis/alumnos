@@ -12,6 +12,25 @@ let storage = null;     // proveedor de guardado activo
 let dirty = false;      // ¿hay cambios sin guardar?
 let vista = { nombre: "buscar", params: {} };
 let textoBusqueda = ""; // búsqueda global (vista Buscar)
+let destinoExport = "drive"; // "drive" = a la carpeta de Drive · "descarga" = a Descargas
+
+// ¿Podemos escribir en la carpeta de Google Drive conectada?
+const puedeGuardarEnDrive = () => !!(storage && typeof storage.guardarExport === "function");
+
+// Entrega una exportación al destino elegido.
+async function entregarExport(archivo, etiqueta) {
+  if (destinoExport === "drive" && puedeGuardarEnDrive()) {
+    try {
+      const ruta = await storage.guardarExport(archivo.nombre, archivo.contenido);
+      toast(`📄 ${etiqueta} guardado en Google Drive → ${ruta}`);
+      return;
+    } catch (e) {
+      toast("No se pudo guardar en Drive (" + e.message + "). Se descargó a tu computadora.", "error");
+    }
+  }
+  X.descargar(archivo);
+  toast(`📄 ${etiqueta} descargado: ${archivo.nombre}`);
+}
 
 const $ = sel => document.querySelector(sel);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
@@ -482,7 +501,7 @@ function renderCurso() {
   `;
   $("[data-volver]").addEventListener("click", () => navegar("cursos"));
   $("#btn-editar-curso").addEventListener("click", () => modalCurso(c));
-  $("#btn-exportar-curso").addEventListener("click", () => { X.exportarCurso(db, c.id); toast("📤 Exportado a CSV (Excel)"); });
+  $("#btn-exportar-curso").addEventListener("click", () => entregarExport(X.construirCurso(db, c.id), "Curso «" + c.nombre + "»"));
   $("#btn-eliminar-curso").addEventListener("click", () => {
     if (confirm(`¿Eliminar el curso «${c.nombre}» con TODAS sus ediciones e inscripciones?\nEsta acción no se puede deshacer.`)) {
       M.eliminarCurso(db, c.id);
@@ -535,7 +554,7 @@ function renderEdicion() {
   $("[data-volver-curso]").addEventListener("click", () => navegar("curso", { id: e.cursoId }));
   $("#btn-inscribir-aqui").addEventListener("click", () => modalInscribir({ edicionId: e.id }));
   $("#btn-editar-edicion").addEventListener("click", () => modalEdicion(e.cursoId, e));
-  $("#btn-exportar-edicion").addEventListener("click", () => { X.exportarEdicion(db, e.id); toast("📤 Exportado a CSV (Excel)"); });
+  $("#btn-exportar-edicion").addEventListener("click", () => entregarExport(X.construirEdicion(db, e.id), "Lista de inscritos"));
   $("#btn-eliminar-edicion").addEventListener("click", () => {
     if (confirm("¿Eliminar esta edición y todas sus inscripciones?")) {
       const cursoId = e.cursoId;
@@ -607,17 +626,37 @@ function renderPromos() {
 // ============================================================
 
 function renderExportar() {
+  // Si no hay carpeta de Drive conectada, el destino real es la descarga.
+  const dest = puedeGuardarEnDrive() ? destinoExport : "descarga";
   $("#contenido").innerHTML = `
     <div class="encabezado-vista"><h2>📤 Exportar y respaldos</h2></div>
     <div class="tarjeta">
-      <h3 style="margin-bottom:10px;font-size:17px">Exportar a Excel (CSV)</h3>
+      <h3 style="margin-bottom:10px;font-size:17px">¿Dónde quieres los archivos?</h3>
+      <div class="fila-botones" style="justify-content:flex-start">
+        <button class="btn ${dest === "drive" ? "btn-verde" : "btn-suave"}" id="dest-drive"
+          ${puedeGuardarEnDrive() ? "" : "disabled style='opacity:.5;cursor:not-allowed' title='Disponible al abrir la base desde la carpeta de Google Drive'"}>
+          ${dest === "drive" ? "✓ " : ""}📁 Guardar en Google Drive
+        </button>
+        <button class="btn ${dest === "descarga" ? "btn-verde" : "btn-suave"}" id="dest-descarga">
+          ${dest === "descarga" ? "✓ " : ""}⬇️ Descargar a esta computadora
+        </button>
+      </div>
+      <p style="color:var(--color-texto-suave);font-size:13.5px;margin-top:10px">
+        ${puedeGuardarEnDrive()
+          ? "Guardar en Drive es lo más cómodo: los archivos aparecen en la subcarpeta «exportaciones» y desde Drive se abren con Google Sheets de un clic, igual en la Mac que en la Chromebook."
+          : "Para guardar directo en Drive, abre la base con «Abrir carpeta de Google Drive» desde la pantalla de inicio."}
+      </p>
+    </div>
+    <div class="tarjeta">
+      <h3 style="margin-bottom:10px;font-size:17px">Exportar a hoja de cálculo</h3>
       <div class="fila-botones" style="justify-content:flex-start">
         <button class="btn btn-verde" id="exp-alumnos">👥 Todos los alumnos</button>
         <button class="btn btn-verde" id="exp-inscripciones">📋 Todas las inscripciones</button>
       </div>
       <p style="color:var(--color-texto-suave);font-size:13.5px;margin-top:10px">
         Para exportar un curso o edición específica, entra al curso en el apartado «Cursos» y usa su botón «Exportar».
-        Los archivos CSV se abren directamente en Excel.
+        <br><strong>Para abrirlos:</strong> en Google Drive, clic derecho sobre el archivo →
+        «Abrir con» → «Google Sheets». Funciona igual en Mac y en Chromebook, sin instalar nada.
       </p>
     </div>
     <div class="tarjeta">
@@ -652,9 +691,11 @@ function renderExportar() {
       </div>
     </div>
   `;
-  $("#exp-alumnos").addEventListener("click", () => { X.exportarAlumnos(db); toast("📤 Exportado: alumnos_todos.csv"); });
-  $("#exp-inscripciones").addEventListener("click", () => { X.exportarInscripciones(db); toast("📤 Exportado: inscripciones_todas.csv"); });
-  $("#exp-json").addEventListener("click", () => { X.exportarRespaldoJSON(db); toast("💾 Respaldo descargado"); });
+  $("#dest-drive").addEventListener("click", () => { destinoExport = "drive"; render(); });
+  $("#dest-descarga").addEventListener("click", () => { destinoExport = "descarga"; render(); });
+  $("#exp-alumnos").addEventListener("click", () => entregarExport(X.construirAlumnos(db), "Listado de alumnos"));
+  $("#exp-inscripciones").addEventListener("click", () => entregarExport(X.construirInscripciones(db), "Listado de inscripciones"));
+  $("#exp-json").addEventListener("click", () => entregarExport(X.construirRespaldoJSON(db), "Respaldo completo"));
   $("#btn-cambiar-pass").addEventListener("click", async () => {
     const p1 = prompt("Nueva contraseña (mínimo 4 caracteres):");
     if (!p1) return;

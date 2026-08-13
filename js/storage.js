@@ -224,6 +224,17 @@ export class FolderStorage {
     }
   }
 
+  // Guarda una exportación dentro de la subcarpeta "exportaciones" de la
+  // misma carpeta de Google Drive. Devuelve la ruta para avisar al usuario.
+  async guardarExport(nombre, contenido) {
+    const dirExp = await this.dir.getDirectoryHandle("exportaciones", { create: true });
+    const fh = await dirExp.getFileHandle(nombre, { create: true });
+    const w = await fh.createWritable();
+    await w.write(contenido);
+    await w.close();
+    return `${this.dir.name}/exportaciones/${nombre}`;
+  }
+
   async guardar(db) {
     const cuerpo = JSON.stringify(db, null, 2);
 
