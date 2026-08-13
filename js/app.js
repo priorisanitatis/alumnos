@@ -524,6 +524,8 @@ function renderEdicion() {
   const inscritos = M.inscritosDeEdicion(db, e.id)
     .map(i => ({ i, a: db.alumnos.find(x => x.id === i.alumnoId) }))
     .sort((x, y) => M.nombreLista(x.a || {}).localeCompare(M.nombreLista(y.a || {}), "es"));
+  // Quién no podría recibir su constancia por correo (no bloquea nada: es un recordatorio).
+  const sinEmail = inscritos.filter(({ a }) => a && !(a.email || "").trim()).map(({ a }) => a);
   $("#contenido").innerHTML = `
     <div class="migas"><a data-volver-cursos>← Cursos</a> / <a data-volver-curso>${esc(c?.nombre || "?")}</a></div>
     <div class="tarjeta">
@@ -539,6 +541,13 @@ function renderEdicion() {
         </div>
       </div>
       ${e.nota ? `<p style="color:var(--color-texto-suave)">${esc(e.nota)}</p>` : ""}
+      ${sinEmail.length ? `<div class="aviso-duplicado" style="margin-top:12px">
+        📧 <strong>${sinEmail.length} sin email:</strong>
+        ${sinEmail.map(a => `<a data-ir-alumno="${a.id}">${esc(M.nombreCompleto(a))}</a>`).join(" · ")}
+        <br><span style="color:var(--color-texto-suave);font-size:13px">
+        El archivo de constancias se genera igual, con esa casilla en blanco; solo que
+        no podrán recibirla por correo. Haz clic en el nombre para capturar su email.</span>
+      </div>` : ""}
       <h3 style="margin:10px 0 6px;font-size:16px">Inscritos (${inscritos.length})</h3>
       ${inscritos.length ? `<table><thead><tr><th>Alumno</th><th>Email</th><th>Fecha</th><th></th><th></th></tr></thead><tbody>
         ${inscritos.map(({ i, a }) => `
@@ -554,26 +563,15 @@ function renderEdicion() {
   `;
   $("[data-volver-cursos]").addEventListener("click", () => navegar("cursos"));
   $("[data-volver-curso]").addEventListener("click", () => navegar("curso", { id: e.cursoId }));
+  document.querySelectorAll("[data-ir-alumno]").forEach(a =>
+    a.addEventListener("click", () => navegar("alumno", { id: a.dataset.irAlumno })));
   $("#btn-inscribir-aqui").addEventListener("click", () => modalInscribir({ edicionId: e.id }));
   $("#btn-editar-edicion").addEventListener("click", () => modalEdicion(e.cursoId, e));
   $("#btn-exportar-edicion").addEventListener("click", () => entregarExport(X.construirEdicion(db, e.id), "Lista de inscritos"));
-  $("#btn-constancias").addEventListener("click", async () => {
+  $("#btn-constancias").addEventListener("click", () => {
     if (!inscritos.length) return toast("Esta edición no tiene inscritos todavía", "error");
     const archivo = X.construirConstancias(db, e.id);
-    await entregarExport(archivo, `Constancias (${archivo.total} alumnos)`);
-    // Aviso: quien no tenga email no podrá recibir su constancia por correo.
-    if (archivo.sinEmail.length) {
-      setTimeout(() => abrirModal(`
-        <h3>⚠️ ${archivo.sinEmail.length} alumno(s) sin email</h3>
-        <p style="margin-bottom:10px">El archivo se generó completo (sirve para Canva), pero
-        estos alumnos <strong>no podrán recibir su constancia por correo</strong> porque no
-        tienen email capturado:</p>
-        <ul style="margin:0 0 12px 20px">${archivo.sinEmail.map(n => `<li>${esc(n)}</li>`).join("")}</ul>
-        <p style="color:var(--color-texto-suave);font-size:13.5px">
-          Si tienes sus correos, agrégalos en su ficha (Alumnos → el alumno → Editar) y vuelve a exportar.</p>
-        <div class="fila-botones"><button class="btn btn-suave" data-cancelar>Entendido</button></div>
-      `), 400);
-    }
+    entregarExport(archivo, `Constancias (${archivo.total} alumnos)`);
   });
   $("#btn-copiar-nombres").addEventListener("click", async () => {
     const texto = X.nombresParaPegar(db, e.id);
