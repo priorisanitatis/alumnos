@@ -92,14 +92,16 @@ export function construirCurso(db, cursoId) {
 const PARTICULAS = new Set(["de", "del", "la", "las", "los", "y", "e", "da", "van", "von", "di"]);
 
 export function nombreParaConstancia(s) {
-  const t = (s || "").trim();
+  let t = (s || "").trim().replace(/\s+/g, " ");
   if (!t) return "";
-  const todoMinusculas = t === t.toLowerCase();
-  const todoMayusculas = t === t.toUpperCase();
-  if (!todoMinusculas && !todoMayusculas) return t;
-  return t.toLowerCase().split(/\s+/)
-    .map((p, i) => (i > 0 && PARTICULAS.has(p)) ? p : p.charAt(0).toUpperCase() + p.slice(1))
-    .join(" ");
+  // TODO EN MAYÚSCULAS ("OLIMPIA HERNÁNDEZ") → se baja todo para recapitalizar
+  if (t === t.toUpperCase() && /[A-ZÁÉÍÓÚÑÜ]/.test(t)) t = t.toLowerCase();
+  return t.split(" ").map((p, i) => {
+    const bajo = p.toLowerCase();
+    if (i > 0 && PARTICULAS.has(bajo)) return bajo;                 // "de", "la", "del"…
+    if (p === bajo) return p.charAt(0).toUpperCase() + p.slice(1);  // venía en minúsculas → se capitaliza
+    return p;                                                       // ya traía mayúscula propia → se respeta
+  }).join(" ");
 }
 
 function inscritosOrdenadosPorNombre(db, edicionId) {

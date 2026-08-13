@@ -5,6 +5,7 @@
 import * as M from "./model.js";
 import * as X from "./export.js";
 import * as I from "./import.js";
+import { leerXLSX, pareceExcel } from "./xlsx.js";
 import { GraphStorage, FolderStorage, FileStorage } from "./storage.js";
 
 // ---------------- estado global ----------------
@@ -701,11 +702,14 @@ function renderImportPaso1() {
       <p style="margin-bottom:14px">
         Sube el archivo de respuestas de tu formulario (CSV). La app te va a mostrar
         <strong>exactamente qué va a pasar</strong> antes de tocar nada.</p>
-      <input type="file" id="archivo-import" accept=".csv,.txt,text/csv" style="font:inherit">
+      <input type="file" id="archivo-import"
+        accept=".csv,.txt,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        style="font:inherit">
       <p style="color:var(--color-texto-suave);font-size:13.5px;margin-top:14px">
-        <strong>Cómo obtenerlo desde Google Forms:</strong> abre el formulario →
-        pestaña «Respuestas» → ícono verde de Sheets → en la hoja,
-        «Archivo» → «Descargar» → «Valores separados por comas (.csv)».
+        Acepta <strong>Excel (.xlsx)</strong> y <strong>CSV</strong>, así que puedes bajar el archivo
+        como venga.<br>
+        <strong>Desde Google Forms:</strong> abre el formulario → pestaña «Respuestas» →
+        ícono verde de Sheets → en la hoja, «Archivo» → «Descargar» → Excel o CSV, cualquiera sirve.
       </p>
     </div>
     <div class="tarjeta">
@@ -722,7 +726,10 @@ function renderImportPaso1() {
     const f = ev.target.files[0];
     if (!f) return;
     try {
-      const filas = I.parsearCSV(await f.text());
+      const buffer = await f.arrayBuffer();
+      const filas = pareceExcel(f.name, new Uint8Array(buffer, 0, 2))
+        ? await leerXLSX(buffer)
+        : I.parsearCSV(new TextDecoder("utf-8").decode(buffer));
       if (filas.length < 2) return toast("El archivo no tiene filas de datos", "error");
       imp.filas = filas;
       imp.archivo = f.name;
